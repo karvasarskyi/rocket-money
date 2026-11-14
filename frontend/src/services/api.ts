@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import WebApp from '@twa-dev/sdk';
 
 const TOKEN_KEY = 'rm_token';
 
@@ -99,6 +100,9 @@ export const api = axios.create({
 api.interceptors.request.use(config => {
   const token = tokenStore.get();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Always attach the signed Telegram launch data so the backend can (re)verify the user.
+  const initData = WebApp?.initData;
+  if (initData) config.headers['X-Telegram-Init-Data'] = initData;
   return config;
 });
 
@@ -110,7 +114,7 @@ export function setUnauthorizedHandler(fn: () => void) {
 api.interceptors.response.use(
   r => r,
   (error: AxiosError) => {
-    if (error.response?.status === 401 && !String(error.config?.url).includes('/api/auth/init')) {
+    if (error.response?.status === 401 && !String(error.config?.url).includes('/api/auth/telegram')) {
       tokenStore.clear();
       onUnauthorized?.();
     }
@@ -135,7 +139,7 @@ export function errorMessage(err: unknown): string {
 }
 
 export const authInit = (initData: string, startParam?: string) =>
-  api.post<AuthResponse>('/api/auth/init', { initData, startParam }).then(r => r.data);
+  api.post<AuthResponse>('/api/auth/telegram', { initData, startParam }).then(r => r.data);
 export const getMe = () => api.get<{ user: User; wallet: Wallet }>('/api/users/me').then(r => r.data);
 export const getWallet = () => api.get<Wallet>('/api/wallet/me').then(r => r.data);
 export const getTransactions = (page = 1, limit = 20) =>

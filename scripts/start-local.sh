@@ -11,15 +11,35 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="$ROOT/backend/.env"
 LOG_DIR="${LOG_DIR:-/home/ubuntu/rocket-money-logs}"
 PORT="${PORT:-3000}"
-PG_BIN="${PG_BIN:-/usr/lib/postgresql/17/bin}"
-PG_DATA="${PG_DATA:-/home/ubuntu/pg17data}"
+PG_DATA="${PG_DATA:-/home/ubuntu/pg_data}"     # version-agnostic data directory
+PG_SOCK="${PG_SOCK:-/home/ubuntu/pgsockets}"   # avoids /var/run/postgresql permission issues
 PG_PORT=5433
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" "$PG_SOCK"
 
-# 1. PostgreSQL 17 (binaries from $PG_BIN). Re-initialise the data dir if it was lost.
+# 1. PostgreSQL on port 5433. Binaries: $PG_BIN if set, else auto-detect version 18, then 17.
+#    If the data dir already exists, use the binaries matching its PG_VERSION.
+pg_bin_for() { [ -x "/usr/lib/postgresql/$1/bin/pg_ctl" ] && echo "/usr/lib/postgresql/$1/bin"; }
+if [ -z "${PG_BIN:-}" ]; then
+  if [ -f "$PG_DATA/PG_VERSION" ]; then
+    PG_BIN="$(pg_bin_for "$(cat "$PG_DATA/PG_VERSION")" || true)"
+  fi
+  for v in 18 17; do [ -n "${PG_BIN:-}" ] && break; PG_BIN="$(pg_bin_for "$v" || true)"; done
+fi
+[ -n "${PG_BIN:-}" ] && [ -x "$PG_BIN/pg_ctl" ] || { echo "PostgreSQL 18 or 17 not found (set PG_BIN)"; exit 1; }
+PG_VER="$("$PG_BIN/pg_ctl" --version | grep -oE '[0-9]+' | head -1)"
+
 if ! pg_isready -q -h localhost -p "$PG_PORT"; then
   if [ ! -f "$PG_DATA/PG_VERSION" ]; then
-    echo "Initialising PostgreSQL data directory $PG_DATA ..."
+    # Reuse a data dir from an older layout (pg18data / pg17data) of the same major version.
+    for legacy in "/home/ubuntu/pg${PG_VER}data"; do
+      if [ -f "$legacy/PG_VERSION" ] && [ "$(cat "$legacy/PG_VERSION")" = "$PG_VER" ]; then
+        echo "Moving existing data directory $legacy -> $PG_DATA"
+        rm -rf "$PG_DATA"; mv "$legacy" "$PG_DATA"
+      fi
+    done
+  fi
+  if [ ! -f "$PG_DATA/PG_VERSION" ]; then
+    echo "Initialising PostgreSQL $PG_VER data directory $PG_DATA ..."
     rm -rf "$PG_DATA"
     "$PG_BIN/initdb" -D "$PG_DATA" -U postgres --auth=trust --encoding=UTF8 >/dev/null
   fi
@@ -27,8 +47,10 @@ if ! pg_isready -q -h localhost -p "$PG_PORT"; then
   if [ -f "$PG_DATA/postmaster.pid" ] && ! kill -0 "$(head -1 "$PG_DATA/postmaster.pid")" 2>/dev/null; then
     rm -f "$PG_DATA/postmaster.pid"
   fi
-  echo "Starting PostgreSQL..."
-  "$PG_BIN/pg_ctl" -D "$PG_DATA" -o "-p $PG_PORT -k /tmp" -l "$LOG_DIR/postgres.log" -w start
+  echo "Starting PostgreSQL $PG_VER ..."
+  "$PG_BIN/pg_ctl" -D "$PG_DATA" -o "-p $PG_PORT -k $PG_SOCK" -l "$LOG_DIR/postgres.log" -w start
+else
+  echo "PostgreSQL already running on port $PG_PORT"
 fi
 psql -h localhost -p "$PG_PORT" -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='rocketmoney'" | grep -q 1 \
   || psql -h localhost -p "$PG_PORT" -U postgres -d postgres -qc "CREATE DATABASE rocketmoney"

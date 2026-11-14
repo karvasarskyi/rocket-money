@@ -32,7 +32,7 @@ if (!appUrl) {
   await check('Admin panel', '/admin/login.html', (r, t) => r.ok && t.includes('Admin'));
   await check('API health + database + migrations', '/api/health', (r, t) => r.ok && JSON.parse(t).status === 'ok');
   await check('Public settings endpoint', '/api/settings/withdrawal-methods', (r, t) => r.ok && JSON.parse(t).methods.length > 0);
-  await check('Auth rejects unsigned data', '/api/auth/init', r => r.status === 401, {
+  await check('Auth rejects unsigned data', '/api/auth/telegram', r => r.status === 401, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ initData: 'user=%7B%7D&hash=00' }),

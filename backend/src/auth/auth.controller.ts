@@ -10,7 +10,8 @@ import { UsersService } from '../users/users.service';
 export class AuthController {
   constructor(private readonly auth: AuthService, private readonly users: UsersService) {}
 
-  @Post('init')
+  /** Mini App sign-in: verifies Telegram initData and returns a session JWT. `/init` kept as an alias. */
+  @Post(['telegram', 'init'])
   @HttpCode(200)
   @UseGuards(TelegramAuthGuard)
   async init(@Req() req: AuthedRequest, @Body() _body: InitAuthDto) {
