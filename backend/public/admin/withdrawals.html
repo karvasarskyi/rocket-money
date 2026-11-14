@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="robots" content="noindex" /><script src="https://cdn.tailwindcss.com"></script><link rel="preconnect" href="https://fonts.googleapis.com" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /><link rel="stylesheet" href="/admin/admin.css" /><script src="/admin/admin.js"></script><title>Withdrawals · Rocket Money Admin</title></head>
+<body class="min-h-screen"><div class="flex min-h-screen"><aside id="sidebar" class="hidden md:flex w-60 flex-col border-r border-white/5 bg-[#0D0D0D]"></aside><main class="flex-1 p-4 md:p-8 overflow-x-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h1 class="text-2xl font-bold">Withdrawals</h1>
+    <a href="/admin/index.html" class="btn-ghost md:hidden">← Dashboard</a>
+  </div>
+  <form id="filters" class="flex flex-wrap gap-3 mb-4">
+    <select id="status" class="input max-w-[180px]"><option value="">All statuses</option><option>PENDING</option><option>PROCESSING</option><option>APPROVED</option><option>PAID</option><option>REJECTED</option></select>
+    <input id="search" class="input max-w-xs" placeholder="Search user or request ID" />
+    <button class="btn">Filter</button>
+  </form>
+  <div class="card overflow-x-auto"><table><thead><tr><th>User</th><th>Amount</th><th>Method</th><th>Payment details</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead><tbody id="rows"><tr><td colspan="7" class="text-gray-500">Loading…</td></tr></tbody></table></div>
+  <div id="pager" class="flex items-center justify-between mt-4"></div>
+</main></div>
+<script>
+  let page = 1;
+  const params = new URLSearchParams(location.search);
+  if (params.get('status')) document.getElementById('status').value = params.get('status');
+  const ACTIONS = { PENDING: ['PROCESSING', 'APPROVED', 'PAID', 'REJECTED'], PROCESSING: ['APPROVED', 'PAID', 'REJECTED'], APPROVED: ['PROCESSING', 'PAID', 'REJECTED'], PAID: [], REJECTED: [] };
+  const LABEL = { PROCESSING: 'Processing', APPROVED: 'Approve', PAID: 'Mark paid', REJECTED: 'Reject' };
+  async function load(p = 1) {
+    page = p;
+    const q = new URLSearchParams({ page, limit: 20, status: status.value, search: search.value.trim() });
+    try {
+      const d = await RM.api('/withdrawals?' + q);
+      rows.innerHTML = d.items.length ? d.items.map(w =>
+        '<tr><td>' + RM.name(w.user) + '<div class="text-xs text-gray-500 font-mono">' + RM.esc(w.id) + '</div></td><td class="font-semibold">' + RM.money(w.amount) + '</td><td>' + RM.esc(w.method) + '</td>' +
+        '<td class="max-w-[240px] break-words text-xs">' + RM.esc(w.paymentDetails) + (w.adminNote ? '<div class="text-gray-500 mt-1">Note: ' + RM.esc(w.adminNote) + '</div>' : '') + '</td>' +
+        '<td>' + RM.badge(w.status) + '</td><td class="text-xs text-gray-400">' + RM.date(w.createdAt) + '</td><td class="whitespace-nowrap space-x-1">' +
+        (ACTIONS[w.status].map(s => '<button class="' + (s === 'REJECTED' ? 'btn-danger' : s === 'PAID' ? 'btn' : 'btn-ghost') + '" onclick="act(\'' + w.id + '\',\'' + s + '\')">' + LABEL[s] + '</button>').join(' ') || '<span class="text-gray-600 text-xs">Final</span>') +
+        '</td></tr>').join('') : '<tr><td colspan="7" class="text-gray-500">No withdrawals</td></tr>';
+      RM.pager('pager', d, load);
+    } catch (e) { RM.toast(e.message, 'error'); }
+  }
+  async function act(id, s) {
+    const msgs = { PAID: 'Confirm you have sent the payment. This cannot be undone.', REJECTED: 'Reject this request? Funds return to the user balance.' };
+    const note = prompt((msgs[s] || 'Change status to ' + s + '?') + '\n\nOptional note (shown to the user for rejections):', '');
+    if (note === null) return;
+    try { await RM.api('/withdrawals/' + id, { method: 'PATCH', body: { status: s, adminNote: note.trim() || undefined } }); RM.toast('Withdrawal ' + s.toLowerCase()); load(page); }
+    catch (e) { RM.toast(e.message, 'error'); }
+  }
+  if (RM.init('withdrawals.html')) { filters.addEventListener('submit', e => { e.preventDefault(); load(1); }); load(1); }
+</script>
+</body></html>

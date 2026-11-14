@@ -1,22 +1,22 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
   "framework": null,
-  "installCommand": "npm install",
+  "installCommand": "npm install --include=dev",
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "api/index.js": {
+    "api/index.ts": {
       "maxDuration": 30,
-      "includeFiles": "{backend/dist/**,node_modules/.prisma/client/**,backend/prisma/schema.prisma}"
+      "includeFiles": "{backend/dist/**,node_modules/.prisma/client/**}"
     }
   },
   "redirects": [
     { "source": "/admin", "destination": "/admin/index.html", "permanent": false }
   ],
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" },
-    { "source": "/webhook", "destination": "/api" },
-    { "source": "/admin/api/:path*", "destination": "/api" },
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/webhook", "destination": "/api/index" },
     { "source": "/((?!api/|admin/|webhook).*)", "destination": "/index.html" }
   ],
   "headers": [
@@ -29,7 +29,8 @@
       "headers": [
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "no-referrer" }
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "X-Robots-Tag", "value": "noindex" }
       ]
     }
   ]

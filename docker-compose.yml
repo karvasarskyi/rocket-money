@@ -1,0 +1,37 @@
+# Optional self-hosted setup (NOT needed for Vercel).
+# Usage: cp .env.example .env  (fill in the Telegram + JWT values)  &&  docker compose up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rocket
+      POSTGRES_PASSWORD: rocket
+      POSTGRES_DB: rocket
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U rocket']
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://rocket:rocket@db:5432/rocket
+      DIRECT_URL: postgresql://rocket:rocket@db:5432/rocket
+      PORT: 3001
+      NODE_ENV: production
+    depends_on:
+      db: { condition: service_healthy }
+    ports:
+      - '3001:3001'
+
+  frontend:
+    build: { context: ., dockerfile: frontend/Dockerfile }
+    depends_on: [backend]
+    ports:
+      - '8080:80'
+
+volumes:
+  pgdata:

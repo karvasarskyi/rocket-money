@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="robots" content="noindex" /><script src="https://cdn.tailwindcss.com"></script><link rel="preconnect" href="https://fonts.googleapis.com" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /><link rel="stylesheet" href="/admin/admin.css" /><script src="/admin/admin.js"></script><title>Users · Rocket Money Admin</title></head>
+<body class="min-h-screen"><div class="flex min-h-screen"><aside id="sidebar" class="hidden md:flex w-60 flex-col border-r border-white/5 bg-[#0D0D0D]"></aside><main class="flex-1 p-4 md:p-8 overflow-x-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h1 class="text-2xl font-bold">Users</h1>
+    <a href="/admin/index.html" class="btn-ghost md:hidden">← Dashboard</a>
+  </div>
+  <form id="filters" class="flex flex-wrap gap-3 mb-4">
+    <input id="search" class="input max-w-xs" placeholder="Search name, @username, Telegram ID, code" />
+    <select id="blocked" class="input max-w-[160px]"><option value="">All users</option><option value="false">Active</option><option value="true">Blocked</option></select>
+    <button class="btn">Search</button>
+  </form>
+  <div class="card overflow-x-auto"><table><thead><tr><th>User</th><th>Telegram ID</th><th>Balance</th><th>Earned</th><th>Referrals</th><th>Status</th><th>Joined</th><th></th></tr></thead><tbody id="rows"><tr><td colspan="8" class="text-gray-500">Loading…</td></tr></tbody></table></div>
+  <div id="pager" class="flex items-center justify-between mt-4"></div>
+  <div id="modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center p-4 z-40" onclick="if(event.target===this)closeModal()">
+    <div class="card w-full max-w-3xl max-h-[85vh] overflow-y-auto p-6" id="modalBody"></div>
+  </div>
+</main></div>
+<script>
+  let page = 1;
+  async function load(p = 1) {
+    page = p;
+    const q = new URLSearchParams({ page, limit: 20, search: search.value.trim(), blocked: blocked.value });
+    try {
+      const d = await RM.api('/users?' + q);
+      rows.innerHTML = d.items.length ? d.items.map(u =>
+        '<tr><td>' + RM.name(u) + '<div class="text-xs text-gray-500">Code ' + RM.esc(u.referralCode) + '</div></td><td class="font-mono text-xs">' + RM.esc(u.telegramId) + '</td>' +
+        '<td>' + RM.money(u.wallet && u.wallet.balance) + '</td><td>' + RM.money(u.wallet && u.wallet.totalEarned) + '</td><td>' + u._count.referralsMade + '</td>' +
+        '<td>' + RM.badge(u.isBlocked ? 'BLOCKED' : 'ACTIVE') + '</td><td class="text-xs text-gray-400">' + RM.date(u.createdAt) + '</td>' +
+        '<td class="whitespace-nowrap"><button class="btn-ghost" onclick="view(\'' + u.id + '\')">View</button> ' +
+        (u.isBlocked ? '<button class="btn-ghost" onclick="toggle(\'' + u.id + '\', false)">Unblock</button>' : '<button class="btn-danger" onclick="toggle(\'' + u.id + '\', true)">Block</button>') + '</td></tr>').join('')
+        : '<tr><td colspan="8" class="text-gray-500">No users found</td></tr>';
+      RM.pager('pager', d, load);
+    } catch (e) { RM.toast(e.message, 'error'); }
+  }
+  async function toggle(id, block) {
+    if (!confirm(block ? 'Block this user? They will lose access to the app.' : 'Unblock this user?')) return;
+    try { await RM.api('/users/' + id + (block ? '/block' : '/unblock'), { method: 'POST' }); RM.toast(block ? 'User blocked' : 'User unblocked'); load(page); }
+    catch (e) { RM.toast(e.message, 'error'); }
+  }
+  function closeModal() { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+  async function view(id) {
+    modal.classList.remove('hidden'); modal.classList.add('flex'); modalBody.innerHTML = '<p class="text-gray-500">Loading…</p>';
+    try {
+      const u = await RM.api('/users/' + id), w = u.wallet || {};
+      const stat = (l, v) => '<div class="bg-black/40 rounded-xl p-3"><p class="text-xs text-gray-500">' + l + '</p><p class="font-semibold">' + v + '</p></div>';
+      modalBody.innerHTML =
+        '<div class="flex justify-between items-start mb-4"><div><h2 class="text-xl font-bold">' + RM.name(u) + '</h2><p class="text-xs text-gray-500 font-mono">TG ' + RM.esc(u.telegramId) + ' · ID ' + RM.esc(u.id) + '</p></div><button class="btn-ghost" onclick="closeModal()">Close</button></div>' +
+        '<div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">' + stat('Balance', RM.money(w.balance)) + stat('Pending withdraw', RM.money(w.pendingWithdraw)) + stat('Total earned', RM.money(w.totalEarned)) +
+        stat('Registration bonus', RM.money(w.registrationBonus)) + stat('Referral earnings', RM.money(w.referralEarnings)) + stat('Total withdrawn', RM.money(w.totalWithdrawn)) + '</div>' +
+        '<p class="text-sm mb-1"><span class="text-gray-500">Referral code:</span> ' + RM.esc(u.referralCode) + '</p>' +
+        '<p class="text-sm mb-4"><span class="text-gray-500">Invited by:</span> ' + (u.referredBy ? RM.name(u.referredBy) : '—') + ' · <span class="text-gray-500">Status:</span> ' + RM.badge(u.isBlocked ? 'BLOCKED' : 'ACTIVE') + '</p>' +
+        '<h3 class="font-semibold mt-4 mb-2">Referrals (' + u._count.referralsMade + ')</h3>' +
+        (u.referralsMade.length ? u.referralsMade.map(r => '<div class="flex justify-between text-sm py-1 border-b border-white/5"><span>' + RM.name(r.invitee) + '</span><span class="text-gray-500">' + RM.date(r.createdAt) + '</span></div>').join('') : '<p class="text-sm text-gray-500">None</p>') +
+        '<h3 class="font-semibold mt-4 mb-2">Transactions</h3>' +
+        (u.transactions.length ? u.transactions.map(t => '<div class="flex justify-between text-sm py-1 border-b border-white/5"><span>' + RM.esc(t.description) + ' ' + RM.badge(t.status) + '</span><span class="' + (Number(t.amount) < 0 ? 'text-red-400' : 'text-[#00FF88]') + '">' + RM.money(t.amount) + '</span></div>').join('') : '<p class="text-sm text-gray-500">None</p>') +
+        '<h3 class="font-semibold mt-4 mb-2">Withdrawals</h3>' +
+        (u.withdrawals.length ? u.withdrawals.map(x => '<div class="flex justify-between text-sm py-1 border-b border-white/5"><span>' + RM.esc(x.method) + ' ' + RM.badge(x.status) + '</span><span>' + RM.money(x.amount) + '</span></div>').join('') : '<p class="text-sm text-gray-500">None</p>');
+    } catch (e) { modalBody.innerHTML = '<p class="text-red-400">' + RM.esc(e.message) + '</p>'; }
+  }
+  if (RM.init('users.html')) { filters.addEventListener('submit', e => { e.preventDefault(); load(1); }); load(1); }
+</script>
+</body></html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="robots" content="noindex" /><script src="https://cdn.tailwindcss.com"></script><link rel="preconnect" href="https://fonts.googleapis.com" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /><link rel="stylesheet" href="/admin/admin.css" /><script src="/admin/admin.js"></script><title>Dashboard · Rocket Money Admin</title></head>
+<body class="min-h-screen"><div class="flex min-h-screen"><aside id="sidebar" class="hidden md:flex w-60 flex-col border-r border-white/5 bg-[#0D0D0D]"></aside><main class="flex-1 p-4 md:p-8 overflow-x-hidden">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">Dashboard</h1>
+    <div class="flex gap-2 md:hidden"><a href="/admin/users.html" class="btn-ghost">Users</a><a href="/admin/withdrawals.html" class="btn-ghost">Withdrawals</a><a href="/admin/settings.html" class="btn-ghost">Settings</a></div>
+  </div>
+  <div id="stats" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"><p class="text-gray-500">Loading…</p></div>
+  <div class="grid lg:grid-cols-2 gap-6">
+    <div class="card p-5"><div class="flex justify-between mb-3"><h2 class="font-semibold">Pending withdrawals</h2><a class="text-[#00FF88] text-sm" href="/admin/withdrawals.html?status=PENDING">View all →</a></div><div id="pending" class="text-sm text-gray-500">Loading…</div></div>
+    <div class="card p-5"><h2 class="font-semibold mb-3">Recent admin activity</h2><div id="audit" class="text-sm text-gray-500">Loading…</div></div>
+  </div>
+</main></div>
+<script>
+  if (RM.init('index.html')) (async () => {
+    try {
+      const s = await RM.api('/stats');
+      const cards = [
+        ['Total users', s.totalUsers, '+' + s.newUsersToday + ' today'],
+        ['Total referrals', s.totalReferrals, '+' + s.referralsToday + ' today'],
+        ['User balances', RM.money(s.totalBalance), 'Available to users'],
+        ['Pending withdrawals', RM.money(s.pendingWithdrawals.amount), s.pendingWithdrawals.count + ' requests'],
+        ['Total paid out', RM.money(s.paidWithdrawals.amount), s.paidWithdrawals.count + ' withdrawals'],
+        ['Bonuses paid', RM.money(s.totalBonusesPaid), 'Registration bonuses'],
+        ['Referral rewards', RM.money(s.totalReferralRewardsPaid), 'Paid to inviters'],
+        ['Blocked users', s.blockedUsers, 'Accounts'],
+      ];
+      document.getElementById('stats').innerHTML = cards.map(([l, v, sub]) =>
+        '<div class="card p-5"><p class="text-gray-500 text-sm">' + l + '</p><p class="text-2xl font-bold mt-1">' + v + '</p><p class="text-xs text-[#00FF88] mt-1">' + sub + '</p></div>').join('');
+      const w = await RM.api('/withdrawals?status=PENDING&limit=5');
+      document.getElementById('pending').innerHTML = w.items.length ? w.items.map(i =>
+        '<div class="flex justify-between py-2 border-b border-white/5"><span>' + RM.name(i.user) + '<br><span class="text-gray-500 text-xs">' + RM.esc(i.method) + ' · ' + RM.date(i.createdAt) + '</span></span><span class="font-semibold text-white">' + RM.money(i.amount) + '</span></div>').join('') : 'No pending withdrawals 🎉';
+      const a = await RM.api('/audit-logs?limit=8');
+      document.getElementById('audit').innerHTML = a.items.length ? a.items.map(i =>
+        '<div class="flex justify-between py-2 border-b border-white/5"><span class="text-gray-300">' + RM.esc(i.action) + ' <span class="text-gray-500">by ' + RM.esc(i.admin.username) + '</span></span><span class="text-xs">' + RM.date(i.createdAt) + '</span></div>').join('') : 'No activity yet';
+    } catch (e) { RM.toast(e.message, 'error'); }
+  })();
+</script>
+</body></html>

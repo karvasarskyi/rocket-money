@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="robots" content="noindex" /><script src="https://cdn.tailwindcss.com"></script><link rel="preconnect" href="https://fonts.googleapis.com" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /><link rel="stylesheet" href="/admin/admin.css" /><script src="/admin/admin.js"></script><title>Transactions · Rocket Money Admin</title></head>
+<body class="min-h-screen"><div class="flex min-h-screen"><aside id="sidebar" class="hidden md:flex w-60 flex-col border-r border-white/5 bg-[#0D0D0D]"></aside><main class="flex-1 p-4 md:p-8 overflow-x-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h1 class="text-2xl font-bold">Transactions</h1>
+    <a href="/admin/index.html" class="btn-ghost md:hidden">← Dashboard</a>
+  </div>
+  <form id="filters" class="flex flex-wrap gap-3 mb-4">
+    <select id="type" class="input max-w-[220px]"><option value="">All types</option><option value="REGISTRATION_BONUS">Registration bonus</option><option value="REFERRAL_REWARD">Referral reward</option><option value="WITHDRAWAL">Withdrawal</option><option value="WITHDRAWAL_REVERSAL">Withdrawal reversal</option></select>
+    <button class="btn">Filter</button>
+  </form>
+  <div class="card overflow-x-auto"><table><thead><tr><th>Date</th><th>User</th><th>Type</th><th>Description</th><th>Status</th><th class="text-right">Amount</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="text-gray-500">Loading…</td></tr></tbody></table></div>
+  <div id="pager" class="flex items-center justify-between mt-4"></div>
+</main></div>
+<script>
+  async function load(p = 1) {
+    const q = new URLSearchParams({ page: p, limit: 25, type: type.value });
+    try {
+      const d = await RM.api('/transactions?' + q);
+      rows.innerHTML = d.items.length ? d.items.map(t =>
+        '<tr><td class="text-xs text-gray-400 whitespace-nowrap">' + RM.date(t.createdAt) + '</td><td>' + RM.name(t.user) + '</td><td class="text-xs">' + RM.esc(t.type.replace(/_/g, ' ')) + '</td>' +
+        '<td>' + RM.esc(t.description) + '</td><td>' + RM.badge(t.status) + '</td><td class="text-right font-semibold ' + (Number(t.amount) < 0 ? 'text-red-400' : 'text-[#00FF88]') + '">' + (Number(t.amount) > 0 ? '+' : '') + RM.money(t.amount) + '</td></tr>').join('')
+        : '<tr><td colspan="6" class="text-gray-500">No transactions</td></tr>';
+      RM.pager('pager', d, load);
+    } catch (e) { RM.toast(e.message, 'error'); }
+  }
+  if (RM.init('transactions.html')) { filters.addEventListener('submit', e => { e.preventDefault(); load(1); }); load(1); }
+</script>
+</body></html>

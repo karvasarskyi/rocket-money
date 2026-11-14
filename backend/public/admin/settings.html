@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="robots" content="noindex" /><script src="https://cdn.tailwindcss.com"></script><link rel="preconnect" href="https://fonts.googleapis.com" /><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /><link rel="stylesheet" href="/admin/admin.css" /><script src="/admin/admin.js"></script><title>Settings · Rocket Money Admin</title></head>
+<body class="min-h-screen"><div class="flex min-h-screen"><aside id="sidebar" class="hidden md:flex w-60 flex-col border-r border-white/5 bg-[#0D0D0D]"></aside><main class="flex-1 p-4 md:p-8 overflow-x-hidden">
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h1 class="text-2xl font-bold">Settings</h1>
+    <a href="/admin/index.html" class="btn-ghost md:hidden">← Dashboard</a>
+  </div>
+  <form id="form" class="card p-6 max-w-2xl space-y-5">
+    <div class="grid md:grid-cols-3 gap-4">
+      <div><label class="text-sm text-gray-400">Registration bonus ($)</label><input id="REGISTRATION_BONUS" class="input mt-1" inputmode="decimal" /></div>
+      <div><label class="text-sm text-gray-400">Referral reward ($)</label><input id="REFERRAL_REWARD" class="input mt-1" inputmode="decimal" /></div>
+      <div><label class="text-sm text-gray-400">Minimum withdrawal ($)</label><input id="MIN_WITHDRAWAL" class="input mt-1" inputmode="decimal" /></div>
+    </div>
+    <div><label class="text-sm text-gray-400">Withdrawal methods (one per line)</label><textarea id="WITHDRAWAL_METHODS" rows="4" class="input mt-1"></textarea></div>
+    <label class="flex items-center gap-3"><input type="checkbox" id="REGISTRATION_ENABLED" class="w-5 h-5 accent-[#00FF88]" /> <span>New user registration enabled</span></label>
+    <label class="flex items-center gap-3"><input type="checkbox" id="REFERRAL_SYSTEM_ENABLED" class="w-5 h-5 accent-[#00FF88]" /> <span>Referral rewards enabled</span></label>
+    <p class="text-xs text-gray-500">Changes apply to new events only. Existing balances and past rewards are never modified.</p>
+    <button class="btn" id="save">Save settings</button>
+  </form>
+</main></div>
+<script>
+  const MONEY = ['REGISTRATION_BONUS', 'REFERRAL_REWARD', 'MIN_WITHDRAWAL'], BOOL = ['REGISTRATION_ENABLED', 'REFERRAL_SYSTEM_ENABLED'];
+  async function load() {
+    try {
+      const list = await RM.api('/settings'), s = Object.fromEntries(list.map(i => [i.key, i.value]));
+      MONEY.forEach(k => document.getElementById(k).value = s[k] || '');
+      BOOL.forEach(k => document.getElementById(k).checked = s[k] === 'true');
+      let methods = []; try { methods = JSON.parse(s.WITHDRAWAL_METHODS || '[]'); } catch (e) {}
+      WITHDRAWAL_METHODS.value = methods.join('\n');
+    } catch (e) { RM.toast(e.message, 'error'); }
+  }
+  if (RM.init('settings.html')) {
+    load();
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const settings = {};
+      MONEY.forEach(k => settings[k] = document.getElementById(k).value.trim());
+      BOOL.forEach(k => settings[k] = document.getElementById(k).checked ? 'true' : 'false');
+      settings.WITHDRAWAL_METHODS = JSON.stringify(WITHDRAWAL_METHODS.value.split('\n').map(s => s.trim()).filter(Boolean));
+      save.disabled = true;
+      try { await RM.api('/settings', { method: 'PUT', body: { settings } }); RM.toast('Settings saved'); load(); }
+      catch (ex) { RM.toast(ex.message, 'error'); } finally { save.disabled = false; }
+    });
+  }
+</script>
+</body></html>
