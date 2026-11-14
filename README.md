@@ -42,7 +42,7 @@ Everything runs on **Vercel**, with a free PostgreSQL database from **Neon** (or
 1. In Telegram, open **@BotFather** and send `/newbot`.
 2. Choose a display name (for example `Rocket Money`) and a username ending in `bot` (for example `RocketMoneyCashBot`).
 3. BotFather replies with a **token** like `1234567890:AAH...`. Save it. This is your `TELEGRAM_BOT_TOKEN`. **Never share it.**
-4. Save the username **without the @**. This is your `TELEGRAM_BOT_USERNAME`.
+4. Save the username **without the @**. This is your `TELEGRAM_BOT_USERNAME`. (The live bot is already set up as **@RocketMX_bot**, so use `RocketMX_bot`.)
 5. Optional: open **@userinfobot** to get your own numeric Telegram ID. Use it for `ADMIN_TELEGRAM_IDS` so the bot notifies you about withdrawal requests.
 
 ### 🟢 Step 4: Create the database (Neon)
@@ -78,7 +78,7 @@ You need two long random strings: one for `JWT_SECRET` and one for `TELEGRAM_WEB
 | Name | Value |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | token from Step 3 |
-| `TELEGRAM_BOT_USERNAME` | bot username **without @** |
+| `TELEGRAM_BOT_USERNAME` | `RocketMX_bot` (bot username **without @**) |
 | `TELEGRAM_WEBHOOK_SECRET` | random string #2 from Step 5 |
 | `DATABASE_URL` | pooled string from Step 4 |
 | `DIRECT_URL` | direct string from Step 4 |
@@ -127,7 +127,7 @@ This sets the webhook, registers the bot commands (`/start`, `/balance`, `/refer
 ### 🟢 Step 11: Open the Mini App 🎉
 1. Open your bot in Telegram and press **Start**.
 2. The bot welcomes you, credits the **$5 bonus**, and shows an **🚀 Open Rocket Money** button. Tap it.
-3. Your referral link looks like `https://t.me/YourBot?start=ABCD2345`. When a friend opens it and presses Start, they get $5 and you get $0.25.
+3. Your referral link looks like `https://t.me/RocketMX_bot?start=ABCD2345`. When a friend opens it and presses Start, they get $5 and you get $0.25.
 
 ### 🟢 Step 12: Open the admin panel
 Go to `https://YOUR-DOMAIN/admin` and log in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`. There you can:

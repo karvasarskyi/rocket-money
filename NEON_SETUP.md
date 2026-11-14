@@ -46,7 +46,7 @@ In Vercel project settings → Environment Variables, add:
 - DATABASE_URL = (from Neon, the pooler URL)
 - DIRECT_URL = (from Neon, the direct URL)
 - TELEGRAM_BOT_TOKEN = your bot token
-- TELEGRAM_BOT_USERNAME = your bot @username (without @)
+- TELEGRAM_BOT_USERNAME = RocketMX_bot (no @)
 - APP_URL = https://your-vercel-app.vercel.app
 - MINI_APP_URL = https://your-vercel-app.vercel.app
 - FRONTEND_URL = https://your-vercel-app.vercel.app
