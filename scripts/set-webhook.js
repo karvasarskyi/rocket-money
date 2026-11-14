@@ -21,7 +21,7 @@ loadEnv(path.join(__dirname, '..', '.env'));
 loadEnv(path.join(__dirname, '..', 'backend', '.env'));
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const appUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
+const appUrl = (process.env.APP_URL || process.env.MINI_APP_URL || '').replace(/\/+$/, '');
 const secret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
 
 if (!token) {
@@ -81,6 +81,10 @@ async function tg(method, body) {
   const info = await tg('getWebhookInfo');
   console.log(`ℹ Pending updates: ${info.pending_update_count}${info.last_error_message ? ` · Last error: ${info.last_error_message}` : ''}`);
   const configured = (process.env.TELEGRAM_BOT_USERNAME || '').replace('@', '');
+  console.log('\nNext steps:');
+  console.log(`  1. Open @${me.username} in Telegram and send /start`);
+  console.log('  2. Tap "Open App" — the Mini App should show a $5.00 balance');
+  console.log(`  3. Admin panel: ${appUrl}/admin/`);
   if (configured && configured.toLowerCase() !== String(me.username).toLowerCase()) {
     console.warn(`⚠ TELEGRAM_BOT_USERNAME (${configured}) does not match the bot (@${me.username}). Referral links would be wrong.`);
   }
