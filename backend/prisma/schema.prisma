@@ -1,0 +1,146 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id               String    @id @default(cuid())
+  telegramId       BigInt    @unique
+  username         String?
+  firstName        String
+  lastName         String?
+  referralCode     String    @unique @default(cuid())
+  referredById     String?
+  referredBy       User?     @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals        User[]    @relation("UserReferrals")
+  isBlocked        Boolean   @default(false)
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  wallet           Wallet?
+  transactions     Transaction[]
+  withdrawals      Withdrawal[]
+  referralsMade    Referral[] @relation("ReferralInviter")
+  referralReceived Referral?  @relation("ReferralInvitee")
+
+  @@map("users")
+}
+
+model Wallet {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  balance           Decimal  @db.Decimal(10, 2) @default(0.00)
+  totalEarned       Decimal  @db.Decimal(10, 2) @default(0.00)
+  totalWithdrawn    Decimal  @db.Decimal(10, 2) @default(0.00)
+  pendingWithdraw   Decimal  @db.Decimal(10, 2) @default(0.00)
+  registrationBonus Decimal  @db.Decimal(10, 2) @default(0.00)
+  referralEarnings  Decimal  @db.Decimal(10, 2) @default(0.00)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("wallets")
+}
+
+model Referral {
+  id           String   @id @default(cuid())
+  inviterId    String
+  inviteeId    String   @unique
+  inviter      User     @relation("ReferralInviter", fields: [inviterId], references: [id])
+  invitee      User     @relation("ReferralInvitee", fields: [inviteeId], references: [id])
+  rewardPaid   Boolean  @default(false)
+  rewardAmount Decimal  @db.Decimal(10, 2) @default(0.25)
+  createdAt    DateTime @default(now())
+
+  @@map("referrals")
+}
+
+model Transaction {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id])
+  type        TransactionType
+  amount      Decimal           @db.Decimal(10, 2)
+  status      TransactionStatus @default(COMPLETED)
+  description String
+  metadata    Json?
+  createdAt   DateTime          @default(now())
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  REGISTRATION_BONUS
+  REFERRAL_REWARD
+  WITHDRAWAL
+  WITHDRAWAL_REVERSAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+model Withdrawal {
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id])
+  amount         Decimal          @db.Decimal(10, 2)
+  method         String
+  paymentDetails String
+  status         WithdrawalStatus @default(PENDING)
+  adminNote      String?
+  processedById  String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@map("withdrawals")
+}
+
+enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model Admin {
+  id        String          @id @default(cuid())
+  username  String          @unique
+  password  String
+  createdAt DateTime        @default(now())
+  auditLogs AdminAuditLog[]
+
+  @@map("admins")
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  admin     Admin    @relation(fields: [adminId], references: [id])
+  action    String
+  target    String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@map("admin_audit_logs")
+}
+
+model SystemSettings {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_settings")
+}
