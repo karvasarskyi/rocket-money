@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, HttpException, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthedRequest, JwtPayload } from '../common/types';
@@ -15,7 +15,8 @@ export class JwtAdminGuard implements CanActivate {
     let payload: JwtPayload;
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(token);
-    } catch {
+    } catch (err) {
+      if (err instanceof HttpException) throw err; // e.g. 503 when JWT_SECRET is missing
       throw new UnauthorizedException('Invalid or expired admin token');
     }
     if (!payload.admin) throw new UnauthorizedException('Admin access required');

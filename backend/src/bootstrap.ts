@@ -1,6 +1,7 @@
 import './common/bigint';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import { PrismaExceptionFilter } from './common/prisma-exception.filter';
 
 /** Shared configuration for both the standalone server and the Vercel serverless handler. */
 export function configureApp(app: INestApplication) {
@@ -10,4 +11,5 @@ export function configureApp(app: INestApplication) {
   const origins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
   app.enableCors({ origin: origins.length ? origins : true, credentials: false });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: false }));
+  app.useGlobalFilters(new PrismaExceptionFilter());
 }

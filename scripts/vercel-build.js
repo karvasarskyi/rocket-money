@@ -21,8 +21,23 @@ function run(cmd, cwd) {
   execSync(cmd, { cwd, stdio: 'inherit', env: process.env });
 }
 
+/** Database steps must not fail the deploy: /api/health reports the problem and the app seeds itself on start. */
+function tryRun(cmd, cwd) {
+  try {
+    run(cmd, cwd);
+    return true;
+  } catch (err) {
+    console.warn(`\n⚠ "${cmd}" failed (${err.status ?? err.message}). Continuing the build – check /api/health after deploy.`);
+    return false;
+  }
+}
+
 const onVercel = !!process.env.VERCEL;
-const hasDb = !!process.env.DATABASE_URL;
+const hasDb = !!(process.env.DATABASE_URL || process.env.DIRECT_URL);
+if (!process.env.DATABASE_URL && process.env.DIRECT_URL) {
+  process.env.DATABASE_URL = process.env.DIRECT_URL;
+  console.log('ℹ DATABASE_URL not set – using DIRECT_URL for the build steps (set DATABASE_URL for runtime too).');
+}
 if (hasDb && !process.env.DIRECT_URL) {
   // schema.prisma declares directUrl, so Prisma needs DIRECT_URL. Fall back to DATABASE_URL.
   process.env.DIRECT_URL = process.env.DATABASE_URL;
@@ -37,8 +52,7 @@ run('npx prisma generate', backend);
 run('npm run build', backend);
 
 if (hasDb && process.env.SKIP_MIGRATIONS !== 'true') {
-  run('npx prisma migrate deploy', backend);
-  run('node dist/seed.js', backend);
+  if (tryRun('npx prisma migrate deploy', backend)) tryRun('node dist/seed.js', backend);
 } else if (onVercel) {
   console.warn('\n⚠ DATABASE_URL is not set – skipping migrations. Add it in Vercel → Settings → Environment Variables and redeploy.');
 } else {
@@ -54,7 +68,8 @@ fs.cpSync(src, dest, { recursive: true });
 console.log(`\n✔ Admin panel copied to ${path.relative(root, dest)}`);
 
 if (onVercel) {
-  const missing = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'JWT_SECRET', 'APP_URL'].filter(k => !process.env[k]);
+  const missing = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_BOT_USERNAME', 'JWT_SECRET', 'ADMIN_USERNAME', 'ADMIN_PASSWORD'].filter(k => !process.env[k]);
+  if (!process.env.APP_URL && !process.env.VERCEL_PROJECT_PRODUCTION_URL) missing.push('APP_URL');
   if (!hasDb) missing.push('DATABASE_URL');
   if (missing.length) console.warn(`\n⚠ Missing environment variables: ${missing.join(', ')}. The app will not fully work until they are added.`);
 }

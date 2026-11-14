@@ -11,9 +11,11 @@ import { getJwtSecret } from '../common/config';
 @Global()
 @Module({
   imports: [
-    JwtModule.registerAsync({
+    // The secret is resolved on every sign/verify, not at bootstrap: a missing JWT_SECRET must not crash the
+    // serverless function (Nest would call process.exit during DI), it only makes auth endpoints return 503.
+    JwtModule.register({
       global: true,
-      useFactory: () => ({ secret: getJwtSecret() }),
+      secretOrKeyProvider: () => getJwtSecret(),
     }),
     UsersModule,
   ],

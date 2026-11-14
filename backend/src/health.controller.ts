@@ -1,41 +1,61 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { PrismaService } from './prisma/prisma.service';
-import { getAppUrl, getBotUsername } from './common/config';
+import { getAppUrl, getBotUsername, getMissingEnv, RECOMMENDED_ENV } from './common/config';
+
+/** Builds the env part of the health report. Names only – never secret values. */
+export function envReport() {
+  return {
+    missingEnv: getMissingEnv(),
+    missingRecommendedEnv: getMissingEnv(RECOMMENDED_ENV),
+    config: {
+      TELEGRAM_BOT_USERNAME: getBotUsername() || null,
+      APP_URL: getAppUrl() || null,
+      NODE_ENV: process.env.NODE_ENV || null,
+    },
+  };
+}
 
 @Controller('api')
 @SkipThrottle()
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Deployment self-check. Never returns secret values – only whether they are configured. */
+  /** Deployment self-check. Always answers JSON: 200 when fully ready, 503 otherwise (with the reason). */
   @Get('health')
-  async health() {
+  async health(@Res({ passthrough: true }) res: Response) {
+    const env = envReport();
     let database = 'ok';
     let migrations = 'ok';
-    try {
-      await this.prisma.$queryRaw`SELECT 1`;
-      try {
-        await this.prisma.systemSettings.count();
-      } catch {
-        migrations = 'missing – run prisma migrate deploy';
-      }
-    } catch (err) {
-      database = `error: ${(err as Error).message.split('\n')[0]}`;
+    let adminExists: boolean | null = null;
+
+    if (env.missingEnv.includes('DATABASE_URL')) {
+      database = 'not configured (DATABASE_URL missing)';
       migrations = 'unknown';
+    } else {
+      try {
+        await this.prisma.$queryRaw`SELECT 1`;
+        try {
+          await this.prisma.systemSettings.count();
+          adminExists = (await this.prisma.admin.count()) > 0;
+        } catch {
+          migrations = 'missing – run prisma migrate deploy (or redeploy with DATABASE_URL and DIRECT_URL set)';
+        }
+      } catch (err) {
+        database = `error: ${(err as Error).message.split('\n').filter(Boolean).pop()?.trim().slice(0, 200)}`;
+        migrations = 'unknown';
+      }
     }
+
+    const ok = database === 'ok' && migrations === 'ok' && env.missingEnv.length === 0;
+    res.status(ok ? 200 : 503);
     return {
-      status: database === 'ok' && migrations === 'ok' ? 'ok' : 'degraded',
+      status: ok ? 'ok' : 'degraded',
       database,
       migrations,
-      config: {
-        TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
-        TELEGRAM_BOT_USERNAME: getBotUsername() || null,
-        TELEGRAM_WEBHOOK_SECRET: !!process.env.TELEGRAM_WEBHOOK_SECRET,
-        JWT_SECRET: !!process.env.JWT_SECRET,
-        APP_URL: getAppUrl() || null,
-        NODE_ENV: process.env.NODE_ENV || null,
-      },
+      adminExists,
+      ...env,
       time: new Date().toISOString(),
     };
   }

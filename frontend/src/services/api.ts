@@ -120,10 +120,17 @@ api.interceptors.response.use(
 
 export function errorMessage(err: unknown): string {
   const e = err as AxiosError<{ message?: string | string[] }>;
-  const msg = e?.response?.data?.message;
+  const data = e?.response?.data as unknown;
+  const msg = data && typeof data === 'object' ? (data as { message?: string | string[] }).message : undefined;
   if (Array.isArray(msg)) return msg.join(', ');
   if (msg) return msg;
   if (e?.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
+  const status = e?.response?.status;
+  if (status && status >= 500) {
+    // Non-JSON body (e.g. a platform error page): show the first line so the cause is visible.
+    const text = typeof data === 'string' ? data.replace(/<[^>]+>/g, ' ').trim().split('\n').filter(Boolean).slice(0, 2).join(' · ').slice(0, 160) : '';
+    return `Server error (${status})${text ? `: ${text}` : ''}. Open /api/health on this domain for details.`;
+  }
   return e?.message || 'Something went wrong';
 }
 

@@ -16,8 +16,17 @@ PG_DATA="${PG_DATA:-/home/ubuntu/pg17data}"
 PG_PORT=5433
 mkdir -p "$LOG_DIR"
 
-# 1. PostgreSQL
+# 1. PostgreSQL 17 (binaries from $PG_BIN). Re-initialise the data dir if it was lost.
 if ! pg_isready -q -h localhost -p "$PG_PORT"; then
+  if [ ! -f "$PG_DATA/PG_VERSION" ]; then
+    echo "Initialising PostgreSQL data directory $PG_DATA ..."
+    rm -rf "$PG_DATA"
+    "$PG_BIN/initdb" -D "$PG_DATA" -U postgres --auth=trust --encoding=UTF8 >/dev/null
+  fi
+  # Remove a stale lock left behind when the VM was stopped (only if that PID is not alive).
+  if [ -f "$PG_DATA/postmaster.pid" ] && ! kill -0 "$(head -1 "$PG_DATA/postmaster.pid")" 2>/dev/null; then
+    rm -f "$PG_DATA/postmaster.pid"
+  fi
   echo "Starting PostgreSQL..."
   "$PG_BIN/pg_ctl" -D "$PG_DATA" -o "-p $PG_PORT -k /tmp" -l "$LOG_DIR/postgres.log" -w start
 fi

@@ -6,6 +6,8 @@ import { existsSync } from 'fs';
 import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
+import { PrismaService } from './prisma/prisma.service';
+import { seedDatabaseSafely } from './common/seed-database';
 
 /** Standalone server (local development / Docker). On Vercel, serverless.ts is used instead. */
 async function bootstrap() {
@@ -17,7 +19,8 @@ async function bootstrap() {
   // Optionally serve the built Mini App (single-process hosting without Vercel/nginx).
   const frontendDir = process.env.FRONTEND_DIST || join(__dirname, '..', '..', 'frontend', 'dist');
   const indexHtml = join(frontendDir, 'index.html');
-  if (existsSync(indexHtml)) {
+  // Never on Vercel: there the CDN serves frontend/dist and only api/index.ts (serverless.ts) runs.
+  if (!process.env.VERCEL && existsSync(indexHtml)) {
     const isBackendPath = (p: string) => p.startsWith('/api') || p.startsWith('/admin') || p.startsWith('/webhook');
     // Telegram Web embeds the Mini App in an iframe, so the frame restriction is kept only for the admin panel.
     app.use((req: Request, res: Response, next: NextFunction) => {
@@ -31,6 +34,7 @@ async function bootstrap() {
     });
     console.log(`Serving Mini App from ${frontendDir}`);
   }
+  await seedDatabaseSafely(app.get(PrismaService));
   app.enableShutdownHooks();
   const port = Number(process.env.PORT) || 3001;
   await app.listen(port, '0.0.0.0');

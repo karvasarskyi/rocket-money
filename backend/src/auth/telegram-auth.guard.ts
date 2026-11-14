@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthedRequest } from '../common/types';
+import { misconfigured } from '../common/config';
 import { DEV_MOCK_USER, isDevBypassAllowed, verifyInitData } from './telegram-auth.util';
 
 /** Validates Telegram WebApp initData sent in the request body (`initData`) or `x-telegram-init-data` header. */
@@ -15,7 +16,9 @@ export class TelegramAuthGuard implements CanActivate {
       return true;
     }
 
-    const verified = verifyInitData(initData, process.env.TELEGRAM_BOT_TOKEN || '');
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+    if (!botToken) throw misconfigured('TELEGRAM_BOT_TOKEN');
+    const verified = verifyInitData(initData, botToken);
     if (!verified) throw new UnauthorizedException('Invalid Telegram authentication data. Please open the app from Telegram.');
     req.telegramUser = verified.user;
     req.telegramStartParam = verified.startParam || req.body?.startParam || undefined;
