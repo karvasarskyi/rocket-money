@@ -1,0 +1,22 @@
+{
+  "name": "rocket-money",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rocket Money - Telegram referral & rewards Mini App (NestJS + Prisma + React), ready for Vercel",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "vercel-build": "node scripts/vercel-build.js",
+    "build": "npm run build -w backend && npm run build -w frontend && node scripts/copy-admin.js",
+    "dev:backend": "npm run start:dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "db:migrate": "npm run prisma:deploy -w backend",
+    "db:seed": "npm run seed -w backend",
+    "set-webhook": "node scripts/set-webhook.js"
+  }
+}
